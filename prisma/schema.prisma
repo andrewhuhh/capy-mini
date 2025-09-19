@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  password  String
+  apiKey    String?  // OpenRouter API key
+  githubToken String? // GitHub personal access token
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  tasks     Task[]
+  sessions  Session[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id           String   @id @default(uuid())
+  userId       String
+  title        String
+  requirements String   // Original user requirements
+  triageNotes  String?  // AI-generated triage analysis
+  status       TaskStatus @default(TRIAGE)
+  priority     Priority   @default(MEDIUM)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  
+  user             User              @relation(fields: [userId], references: [id])
+  workflowStages   WorkflowStage[]
+  codeReviews      CodeReview[]
+  githubIntegration GithubIntegration?
+  triageQuestions  TriageQuestion[]
+  agenticLoops     AgenticLoop[]
+  approvalGates    ApprovalGate[]
+}
+
+model WorkflowStage {
+  id          String    @id @default(uuid())
+  taskId      String
+  stage       StageType
+  status      StageStatus @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+  error       String?
+  metadata    String?   // JSON string for stage-specific data
+  
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  @@unique([taskId, stage])
+}
+
+model TriageQuestion {
+  id         String   @id @default(uuid())
+  taskId     String
+  question   String
+  answer     String?
+  category   String   // technical, scope, requirements, etc.
+  isRequired Boolean  @default(true)
+  askedAt    DateTime @default(now())
+  answeredAt DateTime?
+  
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model AgenticLoop {
+  id           String   @id @default(uuid())
+  taskId       String
+  iteration    Int
+  phase        LoopPhase
+  status       LoopStatus @default(IN_PROGRESS)
+  planningData String?   // JSON: steps, approach, resources needed
+  executionLog String?   // JSON: actions taken, files modified
+  validation   String?   // JSON: test results, checks performed
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+  
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  @@unique([taskId, iteration])
+}
+
+model ApprovalGate {
+  id           String   @id @default(uuid())
+  taskId       String
+  gateType     GateType
+  status       ApprovalStatus @default(PENDING)
+  requestedAt  DateTime @default(now())
+  respondedAt  DateTime?
+  approverNotes String?
+  metadata     String?  // JSON: context data for the approval
+  
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model CodeReview {
+  id          String   @id @default(uuid())
+  taskId      String
+  filePath    String
+  diffContent String   // The actual diff
+  reviewType  ReviewType
+  severity    Severity
+  issue       String   // Description of the issue
+  suggestion  String?  // Suggested fix
+  lineStart   Int?
+  lineEnd     Int?
+  status      ReviewStatus @default(PENDING)
+  resolvedAt  DateTime?
+  metadata    String?  // JSON: additional analysis data
+  createdAt   DateTime @default(now())
+  
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  @@index([taskId, filePath])
+}
+
+model GithubIntegration {
+  id           String   @id @default(uuid())
+  taskId       String   @unique
+  repository   String   // owner/repo format
+  issueNumber  Int?
+  branchName   String?
+  prNumber     Int?
+  prUrl        String?
+  prStatus     String?  // open, closed, merged
+  webhookId    String?  // For webhook management
+  lastSyncedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model MCPServer {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  type        MCPType  // filesystem, git, github, custom
+  endpoint    String
+  status      ServerStatus @default(DISCONNECTED)
+  capabilities String?  // JSON: available tools and features
+  lastPingAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Enums
+enum TaskStatus {
+  TRIAGE
+  PLANNING
+  IN_PROGRESS
+  REVIEWING
+  APPROVED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum StageType {
+  TRIAGE
+  TASK_CREATION
+  AGENTIC_LOOP
+  CODE_REVIEW
+  PR_CREATION
+}
+
+enum StageStatus {
+  PENDING
+  IN_PROGRESS
+  WAITING_APPROVAL
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum LoopPhase {
+  PLANNING
+  EXECUTION
+  VALIDATION
+  ITERATION
+}
+
+enum LoopStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  ROLLBACK
+}
+
+enum GateType {
+  ARCHITECTURE_DECISION
+  MAJOR_REFACTOR
+  EXTERNAL_DEPENDENCY
+  SECURITY_CHANGE
+  PERFORMANCE_IMPACT
+  MANUAL_REVIEW
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DEFERRED
+}
+
+enum ReviewType {
+  SECURITY
+  PERFORMANCE
+  LOGIC
+  STYLE
+  ARCHITECTURE
+  BEST_PRACTICES
+}
+
+enum Severity {
+  CRITICAL
+  MAJOR
+  MINOR
+  INFO
+}
+
+enum ReviewStatus {
+  PENDING
+  ACKNOWLEDGED
+  RESOLVED
+  IGNORED
+  FALSE_POSITIVE
+}
+
+enum MCPType {
+  FILESYSTEM
+  GIT
+  GITHUB
+  CUSTOM
+}
+
+enum ServerStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  RECONNECTING
+}
