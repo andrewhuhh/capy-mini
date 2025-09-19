@@ -2,10 +2,24 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// For local development (SQLite)
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
+
+// For production (PostgreSQL) - uncomment and comment SQLite above
+// datasource db {
+//   provider = "postgresql"
+//   url      = env("DATABASE_URL")
+// }
+
+// For PlanetScale (MySQL) - uncomment and comment others above
+// datasource db {
+//   provider = "mysql"
+//   url      = env("DATABASE_URL")
+//   relationMode = "prisma"
+// }
 
 model User {
   id        String   @id @default(uuid())
