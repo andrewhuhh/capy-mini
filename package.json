@@ -14,8 +14,11 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "./scripts/setup-db.sh",
+    "db:setup:win": ".\\scripts\\setup-db.bat",
     "deploy:vercel": "./scripts/vercel-setup.sh",
-    "deploy:vercel-quick": "vercel --prod"
+    "deploy:vercel:win": ".\\scripts\\vercel-setup.bat",
+    "deploy:vercel-quick": "vercel --prod",
+    "deploy:frontend": "vercel --prod"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.1",
